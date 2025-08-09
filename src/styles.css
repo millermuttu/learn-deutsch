@@ -1,0 +1,96 @@
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f0f2f5;
+}
+
+.progress-ring-bg { stroke: #e6e6e6; }
+.progress-ring-fg {
+  stroke: #4c51bf;
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.card {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+}
+
+.btn {
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-primary { background-color: #4c51bf; color: white; }
+.btn-primary:hover { background-color: #434190; }
+.btn-secondary { background-color: #e2e8f0; color: #475569; }
+.btn-secondary:hover { background-color: #cbd5e1; }
+.btn-der { background-color: #3b82f6; color: white; }
+.btn-die { background-color: #ef4444; color: white; }
+.btn-das { background-color: #22c55e; color: white; }
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+.modal-overlay.visible { opacity: 1; visibility: visible; }
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  max-width: 700px;
+  width: 95%;
+  transform: scale(0.95);
+  transition: transform 0.3s;
+}
+.modal-overlay.visible .modal-content { transform: scale(1); }
+
+/* Flashcard Styles */
+.flashcard-container { perspective: 1000px; }
+.flashcard {
+  width: 100%;
+  height: 200px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s;
+  cursor: pointer;
+}
+.flashcard.is-flipped { transform: rotateY(180deg); }
+.flashcard-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+.flashcard-front { background-color: #fff; }
+.flashcard-back { background-color: #eef2ff; transform: rotateY(180deg); }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #e6e6e6; padding: 8px; text-align: left; }
+th { background:#f8fafc; }
+
+
