@@ -10,13 +10,11 @@ A lightweight, client-side German learning app with spaced repetition, verbs (mo
 
 - Python HTTP server (recommended)
   - PowerShell:
-    - `cd C:\_Pavitra\Goethe\webapp`
     - `py -m http.server 5500`
   - Open `http://localhost:5500/deutsch-weg.html`
 
 - Node http-server
   - PowerShell:
-    - `cd C:\_Pavitra\Goethe\webapp`
     - `npx http-server -p 5500`
   - Open `http://localhost:5500/deutsch-weg.html`
 
