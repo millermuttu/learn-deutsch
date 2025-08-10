@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- DOM ELEMENTS ---
   const dashboardView = document.getElementById('dashboard-view');
+  const levelA1View = document.getElementById('level-a1-view');
+  const levelA2View = document.getElementById('level-a2-view');
   const practiceView = document.getElementById('practice-view');
   const questionArea = document.getElementById('question-area');
   const answerArea = document.getElementById('answer-area');
@@ -20,12 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalText = document.getElementById('modal-text');
 
   // --- INIT ---
-  function initialize() {
+  async function initialize() {
+    try { await initDB(); await persistVocabularyIfMissing(); } catch (e) { /* non-fatal */ }
     loadProgress();
     Object.keys(vocabulary).forEach(type => {
       vocabulary[type].forEach(word => {
         if (!userProgress[word.id]) {
-          const normalizedType = type === 'modalVerbs' ? 'modalVerbs' : (type === 'irregularVerbs' ? 'irregularVerbs' : type);
+          const normalizedType = type === 'modalVerbs' ? 'modalVerbs' : (type === 'irregularVerbs' ? 'irregularVerbs' : (type === 'separableVerbs' ? 'separableVerbs' : type));
           userProgress[word.id] = { id: word.id, type: normalizedType, level: word.level, srsLevel: 0, nextReview: new Date() };
         }
       });
@@ -38,6 +41,36 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- SRS ---
   function saveProgress() { localStorage.setItem('deutschWegProgressV2', JSON.stringify(userProgress)); }
   function loadProgress() { userProgress = JSON.parse(localStorage.getItem('deutschWegProgressV2') || '{}'); }
+  // Optional local database (IndexedDB) to persist a snapshot of vocabulary and progress
+  let idb;
+  async function initDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('deutschWegDB', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('progress')) db.createObjectStore('progress', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('vocabulary')) db.createObjectStore('vocabulary', { keyPath: 'key' });
+      };
+      req.onsuccess = () => { idb = req.result; resolve(); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function persistVocabularyIfMissing() {
+    if (!idb) return;
+    const tx = idb.transaction('vocabulary', 'readwrite');
+    const store = tx.objectStore('vocabulary');
+    const getReq = store.get('initialized');
+    await new Promise(r => { getReq.onsuccess = r; getReq.onerror = r; });
+    if (!getReq.result) {
+      store.put({ key: 'initialized', at: Date.now() });
+      store.put({ key: 'nouns', data: vocabulary.nouns });
+      store.put({ key: 'verbs', data: vocabulary.verbs });
+      store.put({ key: 'modalVerbs', data: vocabulary.modalVerbs });
+      store.put({ key: 'irregularVerbs', data: vocabulary.irregularVerbs });
+      store.put({ key: 'separableVerbs', data: vocabulary.separableVerbs });
+    }
+    await tx.complete;
+  }
   function getItemsForReview() {
     const now = new Date();
     return Object.values(userProgress).filter(item => new Date(item.nextReview) <= now);
@@ -73,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateDashboard() { document.getElementById('review-count').textContent = getItemsForReview().length; }
   function showView(view) {
     dashboardView.classList.add('hidden');
+    levelA1View.classList.add('hidden');
+    levelA2View.classList.add('hidden');
     practiceView.classList.add('hidden');
     view.classList.remove('hidden');
   }
@@ -253,16 +288,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function addEventListeners() {
     document.getElementById('start-review-btn').addEventListener('click', () => startQuiz('review'));
-    document.querySelectorAll('.module-card').forEach(card => {
-      card.addEventListener('click', e => {
-        const mod = e.currentTarget.dataset.module;
-        const qtype = e.currentTarget.dataset.quizType;
-        if (mod === 'modal-verbs') { showView(practiceView); openModalVerbsMenu(); }
-        else if (mod === 'irregular-verbs') { showView(practiceView); openIrregularVerbsMenu(); }
-        else if (qtype) startQuiz(qtype);
-        else if (mod) startQuiz(mod);
-      });
-    });
+    // Level cards
+    const cardA1 = document.getElementById('card-a1');
+    const cardA2 = document.getElementById('card-a2');
+    if (cardA1) cardA1.addEventListener('click', () => showView(levelA1View));
+    if (cardA2) cardA2.addEventListener('click', () => showView(levelA2View));
+
+    // Level sub-pages
+    const a1Back = document.getElementById('a1-back');
+    const a2Back = document.getElementById('a2-back');
+    if (a1Back) a1Back.addEventListener('click', () => showView(dashboardView));
+    if (a2Back) a2Back.addEventListener('click', () => showView(dashboardView));
+
+    // A1 sections
+    const a1Nouns = document.getElementById('a1-nouns');
+    const a1Verbs = document.getElementById('a1-verbs');
+    const a1Irreg = document.getElementById('a1-irregular-verbs');
+    const a1Modal = document.getElementById('a1-modal-verbs');
+    const a1Separable = document.getElementById('a1-separable-verbs');
+    if (a1Nouns) a1Nouns.addEventListener('click', () => startLevelDomain('A1', 'nouns'));
+    if (a1Verbs) a1Verbs.addEventListener('click', () => startLevelDomain('A1', 'verbs'));
+    if (a1Irreg) a1Irreg.addEventListener('click', () => { showView(practiceView); openIrregularVerbsMenu('A1'); });
+    if (a1Modal) a1Modal.addEventListener('click', () => { showView(practiceView); openModalVerbsMenu('A1'); });
+    if (a1Separable) a1Separable.addEventListener('click', () => { showView(practiceView); openSeparableVerbsMenu('A1'); });
+
+    // A2 sections
+    const a2Nouns = document.getElementById('a2-nouns');
+    const a2Verbs = document.getElementById('a2-verbs');
+    const a2Irreg = document.getElementById('a2-irregular-verbs');
+    const a2Modal = document.getElementById('a2-modal-verbs');
+    const a2Separable = document.getElementById('a2-separable-verbs');
+    if (a2Nouns) a2Nouns.addEventListener('click', () => startLevelDomain('A2', 'nouns'));
+    if (a2Verbs) a2Verbs.addEventListener('click', () => startLevelDomain('A2', 'verbs'));
+    if (a2Irreg) a2Irreg.addEventListener('click', () => { showView(practiceView); openIrregularVerbsMenu('A2'); });
+    if (a2Modal) a2Modal.addEventListener('click', () => { showView(practiceView); openModalVerbsMenu('A2'); });
+    if (a2Separable) a2Separable.addEventListener('click', () => { showView(practiceView); openSeparableVerbsMenu('A2'); });
     document.getElementById('exit-practice-btn').addEventListener('click', endQuiz);
     document.getElementById('next-question-btn').addEventListener('click', () => displayQuestion(++currentQuestionIndex));
     document.getElementById('i-know-this-btn').addEventListener('click', () => {
@@ -270,6 +330,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('know-more-btn').addEventListener('click', showKnowMoreModal);
     document.getElementById('close-modal-btn').addEventListener('click', () => knowMoreModal.classList.remove('visible'));
+  }
+
+  // Start filtered sessions by level and domain
+  function startLevelDomain(level, domain) {
+    // Map domain 'verbs' to verbs + irregularVerbs
+    const pool = Object.values(userProgress).filter(p => {
+      const isDomain = domain === 'nouns' ? p.type === 'nouns' : (p.type === 'verbs' || p.type === 'irregularVerbs');
+      const data = findWordData(p.id);
+      return isDomain && data && data.level === level;
+    });
+    if (pool.length === 0) { alert(`No ${domain} items for ${level} right now!`); return; }
+    currentQuizType = domain === 'nouns' ? 'noun-gender' : 'verb-conjugation';
+    currentQuiz = pool.sort(() => Math.random() - 0.5);
+    currentQuestionIndex = 0;
+    showView(practiceView);
+    displayQuestion();
+  }
+
+  // Start irregular verbs only filtered by level
+  function startIrregularOnly(level) {
+    const pool = Object.values(userProgress).filter(p => {
+      if (p.type !== 'irregularVerbs') return false;
+      const data = findWordData(p.id);
+      return data && data.level === level;
+    });
+    if (pool.length === 0) { alert(`No irregular verbs for ${level} right now!`); return; }
+    // Let user practice conjugations for irregular verbs
+    currentQuizType = 'verb-conjugation';
+    currentQuiz = pool.sort(() => Math.random() - 0.5);
+    currentQuestionIndex = 0;
+    showView(practiceView);
+    displayQuestion();
   }
 
   // --- Normalization helpers for quizzes ---
@@ -314,103 +406,330 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
-  // --- Modal Verbs minimal UI (reuse text-only info/list/quiz quick stubs) ---
-  function openModalVerbsMenu() {
+  // --- Modal Verbs UI (similar to Irregular Verbs) ---
+  let modalLevelFilter = null;
+  function openModalVerbsMenu(level) {
+    modalLevelFilter = level || modalLevelFilter || 'A1';
     const practiceTypeEl = document.getElementById('practice-type');
-    if (practiceTypeEl) practiceTypeEl.textContent = 'Modal Verbs';
+    if (practiceTypeEl) practiceTypeEl.textContent = `Modal Verbs — ${modalLevelFilter}`;
     questionArea.innerHTML = `
       <div class='space-y-4'>
-        <button class='btn btn-secondary w-full' id='modal-back-to-dashboard'>Back to Dashboard</button>
+        <button class='btn btn-secondary w-full' id='modal-back'>Back</button>
         <button class='btn btn-primary w-full' id='btn-modal-info'>Comprehensive Info</button>
         <button class='btn btn-primary w-full' id='btn-modal-list'>List of Modal Verbs</button>
-        <button class='btn btn-primary w-full' id='btn-modal-quiz'>Quizzes</button>
+        <button class='btn btn-primary w-full' id='btn-modal-quiz'>Interactive Quizzes</button>
       </div>`;
     answerArea.innerHTML = '';
-    document.getElementById('modal-back-to-dashboard').addEventListener('click', () => showView(dashboardView));
+    document.getElementById('modal-back').addEventListener('click', () => {
+      if (modalLevelFilter === 'A1') showView(levelA1View);
+      else showView(levelA2View);
+    });
     document.getElementById('btn-modal-info').addEventListener('click', showModalVerbsInfo);
     document.getElementById('btn-modal-list').addEventListener('click', showModalVerbsList);
     document.getElementById('btn-modal-quiz').addEventListener('click', showModalVerbsQuizMenu);
   }
   function showModalVerbsInfo() {
     const practiceTypeEl = document.getElementById('practice-type');
-    if (practiceTypeEl) practiceTypeEl.textContent = 'Modal Verbs - Comprehensive Info';
+    if (practiceTypeEl) practiceTypeEl.textContent = `Modal Verbs - Comprehensive Info (${modalLevelFilter})`;
     questionArea.innerHTML = `
       <button class='btn btn-secondary mb-4' id='modal-back-to-menu'>Back</button>
       <h2 class='text-lg font-bold mb-4'>Modal Verbs — Overview & Usage (A1–A2)</h2>
-      <p class='mb-2'>Modal verbs modify the meaning of a main verb and are followed by an infinitive at the clause end.</p>`;
+      <p class='mb-2'>Modal verbs modify the meaning of a main verb and are followed by an infinitive at the clause end. They express ability, necessity, permission, obligation, and desire.</p>
+      <p class='mb-2'>Key modal verbs: können (can), müssen (must), dürfen (may), sollen (should), wollen (want), mögen (like).</p>`;
     answerArea.innerHTML = '';
-    document.getElementById('modal-back-to-menu').addEventListener('click', openModalVerbsMenu);
+    document.getElementById('modal-back-to-menu').addEventListener('click', () => openModalVerbsMenu(modalLevelFilter));
   }
   function showModalVerbsList() {
     const practiceTypeEl = document.getElementById('practice-type');
-    if (practiceTypeEl) practiceTypeEl.textContent = 'Modal Verbs - List';
+    if (practiceTypeEl) practiceTypeEl.textContent = `Modal Verbs - List (${modalLevelFilter})`;
+    const list = vocabulary.modalVerbs.filter(v => v.level === modalLevelFilter);
     let html = `
       <button class='btn btn-secondary mb-4' id='modal-back-to-menu-2'>Back</button>
-      <h2 class="text-lg font-bold mb-4">Modal Verbs — Conjugation & Examples</h2>
+      <h2 class="text-lg font-bold mb-4">Modal Verbs — ${modalLevelFilter}</h2>
       <div style='overflow:auto'><table><thead><tr>
         <th>Infinitive</th><th>English</th><th>ich</th><th>du</th><th>er/sie/es</th><th>wir</th><th>ihr</th><th>sie/Sie</th><th>Example</th></tr></thead><tbody>`;
-    vocabulary.modalVerbs.forEach(v => {
+    list.forEach(v => {
       html += `<tr><td><strong>${v.infinitive}</strong></td><td>${v.english}</td><td>${v.conjugation['ich']}</td><td>${v.conjugation['du']}</td><td>${v.conjugation['er/sie/es']}</td><td>${v.conjugation['wir']}</td><td>${v.conjugation['ihr']}</td><td>${v.conjugation['sie/Sie']}</td><td>${v.example.de}</td></tr>`;
     });
     html += '</tbody></table></div>';
     questionArea.innerHTML = html; answerArea.innerHTML = '';
-    document.getElementById('modal-back-to-menu-2').addEventListener('click', openModalVerbsMenu);
+    document.getElementById('modal-back-to-menu-2').addEventListener('click', () => openModalVerbsMenu(modalLevelFilter));
   }
   function showModalVerbsQuizMenu() {
     const practiceTypeEl = document.getElementById('practice-type');
-    if (practiceTypeEl) practiceTypeEl.textContent = 'Modal Verbs - Quizzes';
+    if (practiceTypeEl) practiceTypeEl.textContent = `Modal Verbs - Interactive Quizzes (${modalLevelFilter})`;
     questionArea.innerHTML = `
       <div class='space-y-3'>
         <button class='btn btn-secondary w-full' id='modal-back-to-menu-3'>Back</button>
-        <button class='btn btn-primary w-full' id='quiz-meaning'>Test: English meaning (DE → EN)</button>
+        <button class='btn btn-primary w-full' id='quiz-modal-meaning'>English Meaning (DE → EN)</button>
+        <button class='btn btn-primary w-full' id='quiz-modal-conjugation'>Present Conjugation</button>
+        <button class='btn btn-primary w-full' id='quiz-modal-usage'>Usage & Context</button>
       </div>`;
     answerArea.innerHTML = '';
-    document.getElementById('modal-back-to-menu-3').addEventListener('click', openModalVerbsMenu);
-    document.getElementById('quiz-meaning').addEventListener('click', () => startModalQuiz('meaning'));
+    document.getElementById('modal-back-to-menu-3').addEventListener('click', () => openModalVerbsMenu(modalLevelFilter));
+    document.getElementById('quiz-modal-meaning').addEventListener('click', () => startModalQuiz('meaning'));
+    document.getElementById('quiz-modal-conjugation').addEventListener('click', () => startModalQuiz('conjugation'));
+    document.getElementById('quiz-modal-usage').addEventListener('click', () => startModalQuiz('usage'));
   }
-  let modalQuizIndex = 0; let modalQuizMode = null;
-  function startModalQuiz(mode) { modalQuizMode = mode; modalQuizIndex = 0; askModalVerbQuestion(); }
+  let modalQuizIndex = 0; let modalQuizMode = null; let modalVerbsPool = [];
+  function startModalQuiz(mode) {
+    modalQuizMode = mode;
+    modalQuizIndex = 0;
+    modalVerbsPool = vocabulary.modalVerbs.filter(v => v.level === modalLevelFilter);
+    askModalVerbQuestion();
+  }
   function askModalVerbQuestion() {
-    const v = vocabulary.modalVerbs[modalQuizIndex]; if (!v) { questionArea.innerHTML = '<p>No modal verbs available.</p>'; answerArea.innerHTML = ''; return; }
-    const backBtnHtml = `<button class='btn btn-secondary mb-3' id='modal-back-to-quiz-menu'>Back</button>`;
+    const v = modalVerbsPool[modalQuizIndex];
+    if (!v) {
+      questionArea.innerHTML = '<p>No modal verbs available for this level.</p>';
+      answerArea.innerHTML = '';
+      return;
+    }
+    const backBtnHtml = `<button class='btn btn-secondary mb-3' id='modal-back-to-quiz-menu'>Back to Quiz Menu</button>`;
+    const skipNextHtml = `<div class='mt-2 flex gap-2'><button class='btn btn-primary' id='check-btn'>Check</button><button class='btn btn-secondary' id='skip-btn'>Skip</button></div>`;
+    
     if (modalQuizMode === 'meaning') {
-      questionArea.innerHTML = backBtnHtml + `<p class='mb-4 text-xl'>What is the English meaning of <strong>${v.infinitive}</strong>?</p>`;
-      answerArea.innerHTML = `<input id='quizAns' class='p-2 border rounded w-full' placeholder='Type the English meaning...'><div class='mt-2 flex gap-2'><button class='btn btn-primary' id='check-btn'>Check</button><button class='btn btn-secondary' id='skip-btn'>Skip</button></div>`;
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>What is the English meaning of <strong>${v.infinitive}</strong>?</p>`;
+      answerArea.innerHTML = `<input id='modalAns' class='p-2 border rounded w-full' placeholder='Type the English meaning...'>${skipNextHtml}`;
+    } else if (modalQuizMode === 'conjugation') {
+      const pronouns = Object.keys(v.conjugation);
+      const randomPronoun = pronouns[Math.floor(Math.random() * pronouns.length)];
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>Conjugate: <strong>${randomPronoun}</strong> + <strong>${v.infinitive}</strong></p>`;
+      answerArea.innerHTML = `<input id='modalAns' class='p-2 border rounded w-full' placeholder='Type the conjugated form...' data-pronoun='${randomPronoun}'>${skipNextHtml}`;
+    } else if (modalQuizMode === 'usage') {
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>Complete: <strong>Ich ___ schwimmen.</strong> (I can swim)</p><p class='mb-2 text-sm text-gray-500'>Use the correct form of <strong>${v.infinitive}</strong></p>`;
+      answerArea.innerHTML = `<input id='modalAns' class='p-2 border rounded w-full' placeholder='Type the correct form...' data-expected='kann'>${skipNextHtml}`;
+    }
+    
       document.getElementById('check-btn').addEventListener('click', checkModalVerbAnswer);
       document.getElementById('skip-btn').addEventListener('click', () => modalNext());
-    }
-    const backToMenuBtn = document.getElementById('modal-back-to-quiz-menu'); if (backToMenuBtn) backToMenuBtn.addEventListener('click', showModalVerbsQuizMenu);
+    const backToMenuBtn = document.getElementById('modal-back-to-quiz-menu');
+    if (backToMenuBtn) backToMenuBtn.addEventListener('click', showModalVerbsQuizMenu);
   }
   function checkModalVerbAnswer() {
-    const v = vocabulary.modalVerbs[modalQuizIndex]; const ansEl = document.getElementById('quizAns'); if (!ansEl) return; const user = ansEl.value.trim();
-    const correct = isMeaningMatch(user, v.acceptedMeanings || [v.english]); const correctText = v.english;
-    if (correct) { answerArea.innerHTML = `<div class='p-4 bg-green-100 rounded'>✅ Correct! <button class='btn btn-primary ml-2' id='next-btn'>Next</button></div>`; document.getElementById('next-btn').addEventListener('click', () => modalNext(true)); }
-    else {
+    const v = modalVerbsPool[modalQuizIndex];
+    const ansEl = document.getElementById('modalAns');
+    if (!ansEl) return;
+    const user = ansEl.value.trim();
+    let correct = false;
+    let correctText = '';
+    
+    if (modalQuizMode === 'meaning') {
+      correctText = v.english;
+      correct = isMeaningMatch(user, v.acceptedMeanings || [v.english]);
+    } else if (modalQuizMode === 'conjugation') {
+      const pronoun = ansEl.dataset.pronoun;
+      correctText = v.conjugation[pronoun];
+      correct = normalizeGerman(user) === normalizeGerman(correctText);
+    } else if (modalQuizMode === 'usage') {
+      // For usage questions, we'll use a simple example with "können"
+      if (v.infinitive === 'können') {
+        correctText = 'kann';
+        correct = normalizeGerman(user) === normalizeGerman(correctText);
+      } else {
+        // For other modal verbs, use their ich form
+        correctText = v.conjugation['ich'];
+        correct = normalizeGerman(user) === normalizeGerman(correctText);
+      }
+    }
+    
+    if (correct) {
+      answerArea.innerHTML = `<div class='p-4 bg-green-100 rounded'>✅ Correct! <button class='btn btn-primary ml-2' id='next-btn'>Next</button></div>`;
+      document.getElementById('next-btn').addEventListener('click', () => modalNext(true));
+    } else {
       answerArea.innerHTML = `<div class='p-4 bg-red-100 rounded'>❌ Not quite. Correct: <strong>${correctText}</strong><div class='mt-3'><button class='btn btn-primary ml-2' id='next-btn'>Next</button></div></div>`;
       document.getElementById('next-btn').addEventListener('click', () => modalNext(false));
     }
   }
-  function modalNext(wasCorrect) { const v = vocabulary.modalVerbs[modalQuizIndex]; if (v && userProgress[v.id]) updateSRS(v.id, !!wasCorrect); modalQuizIndex = (modalQuizIndex + 1) % vocabulary.modalVerbs.length; askModalVerbQuestion(); }
+  
+  function modalNext(wasCorrect) {
+    const v = modalVerbsPool[modalQuizIndex];
+    if (v && userProgress[v.id]) updateSRS(v.id, !!wasCorrect);
+    modalQuizIndex = (modalQuizIndex + 1) % modalVerbsPool.length;
+    askModalVerbQuestion();
+  }
 
-  // --- Irregular verbs stubs (reuse existing flows) ---
-  let irregularQuizIndex = 0; let irregularQuizMode = null;
-  function openIrregularVerbsMenu() {
-    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = 'Irregular Verbs';
+  // --- Separable Verbs UI (similar to Irregular Verbs) ---
+  let separableLevelFilter = null;
+  function openSeparableVerbsMenu(level) {
+    separableLevelFilter = level || separableLevelFilter || 'A1';
+    const practiceTypeEl = document.getElementById('practice-type');
+    if (practiceTypeEl) practiceTypeEl.textContent = `Separable Verbs — ${separableLevelFilter}`;
     questionArea.innerHTML = `
       <div class='space-y-4'>
-        <button class='btn btn-secondary w-full' id='irregular-back-to-dashboard'>Back to Dashboard</button>
+        <button class='btn btn-secondary w-full' id='separable-back'>Back</button>
+        <button class='btn btn-primary w-full' id='btn-separable-info'>Comprehensive Info</button>
+        <button class='btn btn-primary w-full' id='btn-separable-list'>List of Separable Verbs</button>
+        <button class='btn btn-primary w-full' id='btn-separable-quiz'>Interactive Quizzes</button>
+      </div>`;
+    answerArea.innerHTML = '';
+    document.getElementById('separable-back').addEventListener('click', () => {
+      if (separableLevelFilter === 'A1') showView(levelA1View);
+      else showView(levelA2View);
+    });
+    document.getElementById('btn-separable-info').addEventListener('click', showSeparableVerbsInfo);
+    document.getElementById('btn-separable-list').addEventListener('click', showSeparableVerbsList);
+    document.getElementById('btn-separable-quiz').addEventListener('click', showSeparableVerbsQuizMenu);
+  }
+
+  function showSeparableVerbsInfo() {
+    const practiceTypeEl = document.getElementById('practice-type');
+    if (practiceTypeEl) practiceTypeEl.textContent = `Separable Verbs - Comprehensive Info (${separableLevelFilter})`;
+    questionArea.innerHTML = `
+      <button class='btn btn-secondary mb-4' id='separable-back-to-menu'>Back</button>
+      <h2 class='text-lg font-bold mb-4'>Separable Verbs — Overview & Patterns (A1–A2)</h2>
+      <p class='mb-2'>Separable verbs have prefixes that separate from the main verb in present tense and go to the end of the clause.</p>
+      <p class='mb-2'>Key prefixes: an-, auf-, aus-, ein-, fern-, ab-, um-. The prefix always goes to the end in present tense.</p>
+      <p class='mb-2'>Example: "Ich rufe dich an" (I call you) - "anrufen" becomes "rufe...an"</p>`;
+    answerArea.innerHTML = '';
+    document.getElementById('separable-back-to-menu').addEventListener('click', () => openSeparableVerbsMenu(separableLevelFilter));
+  }
+
+  function showSeparableVerbsList() {
+    const practiceTypeEl = document.getElementById('practice-type');
+    if (practiceTypeEl) practiceTypeEl.textContent = `Separable Verbs - List (${separableLevelFilter})`;
+    const list = vocabulary.separableVerbs.filter(v => v.level === separableLevelFilter);
+    let html = `
+      <button class='btn btn-secondary mb-4' id='separable-back-to-menu-2'>Back</button>
+      <h2 class="text-lg font-bold mb-4">Separable Verbs — ${separableLevelFilter}</h2>
+      <div style='overflow:auto'><table><thead><tr>
+        <th>Infinitive</th><th>English</th><th>Prefix</th><th>Base Verb</th><th>ich</th><th>du</th><th>er/sie/es</th><th>wir</th><th>ihr</th><th>sie/Sie</th><th>Example</th></tr></thead><tbody>`;
+    list.forEach(v => {
+      html += `<tr><td><strong>${v.infinitive}</strong></td><td>${v.english}</td><td>${v.prefix}</td><td>${v.baseVerb}</td><td>${v.conjugation['ich']}</td><td>${v.conjugation['du']}</td><td>${v.conjugation['er/sie/es']}</td><td>${v.conjugation['wir']}</td><td>${v.conjugation['ihr']}</td><td>${v.conjugation['sie/Sie']}</td><td>${v.example.de}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    questionArea.innerHTML = html;
+    answerArea.innerHTML = '';
+    document.getElementById('separable-back-to-menu-2').addEventListener('click', () => openSeparableVerbsMenu(separableLevelFilter));
+  }
+
+  function showSeparableVerbsQuizMenu() {
+    const practiceTypeEl = document.getElementById('practice-type');
+    if (practiceTypeEl) practiceTypeEl.textContent = `Separable Verbs - Interactive Quizzes (${separableLevelFilter})`;
+    questionArea.innerHTML = `
+      <div class='space-y-3'>
+        <button class='btn btn-secondary w-full' id='separable-back-to-menu-3'>Back</button>
+        <button class='btn btn-primary w-full' id='quiz-separable-meaning'>English Meaning (DE → EN)</button>
+        <button class='btn btn-primary w-full' id='quiz-separable-conjugation'>Present Conjugation</button>
+        <button class='btn btn-primary w-full' id='quiz-separable-prefix'>Prefix Identification</button>
+        <button class='btn btn-primary w-full' id='quiz-separable-usage'>Usage & Context</button>
+      </div>`;
+    answerArea.innerHTML = '';
+    document.getElementById('separable-back-to-menu-3').addEventListener('click', () => openSeparableVerbsMenu(separableLevelFilter));
+    document.getElementById('quiz-separable-meaning').addEventListener('click', () => startSeparableQuiz('meaning'));
+    document.getElementById('quiz-separable-conjugation').addEventListener('click', () => startSeparableQuiz('conjugation'));
+    document.getElementById('quiz-separable-prefix').addEventListener('click', () => startSeparableQuiz('prefix'));
+    document.getElementById('quiz-separable-usage').addEventListener('click', () => startSeparableQuiz('usage'));
+  }
+
+  let separableQuizIndex = 0; let separableQuizMode = null; let separableVerbsPool = [];
+  function startSeparableQuiz(mode) {
+    separableQuizMode = mode;
+    separableQuizIndex = 0;
+    separableVerbsPool = vocabulary.separableVerbs.filter(v => v.level === separableLevelFilter);
+    askSeparableVerbQuestion();
+  }
+
+  function askSeparableVerbQuestion() {
+    const v = separableVerbsPool[separableQuizIndex];
+    if (!v) {
+      questionArea.innerHTML = '<p>No separable verbs available for this level.</p>';
+      answerArea.innerHTML = '';
+      return;
+    }
+    const backBtnHtml = `<button class='btn btn-secondary mb-3' id='separable-back-to-quiz-menu'>Back to Quiz Menu</button>`;
+    const skipNextHtml = `<div class='mt-2 flex gap-2'><button class='btn btn-primary' id='check-btn'>Check</button><button class='btn btn-secondary' id='skip-btn'>Skip</button></div>`;
+    
+    if (separableQuizMode === 'meaning') {
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>What is the English meaning of <strong>${v.infinitive}</strong>?</p>`;
+      answerArea.innerHTML = `<input id='separableAns' class='p-2 border rounded w-full' placeholder='Type the English meaning...'>${skipNextHtml}`;
+    } else if (separableQuizMode === 'conjugation') {
+      const pronouns = Object.keys(v.conjugation);
+      const randomPronoun = pronouns[Math.floor(Math.random() * pronouns.length)];
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>Conjugate: <strong>${randomPronoun}</strong> + <strong>${v.infinitive}</strong></p>`;
+      answerArea.innerHTML = `<input id='separableAns' class='p-2 border rounded w-full' placeholder='Type the conjugated form...' data-pronoun='${randomPronoun}'>${skipNextHtml}`;
+    } else if (separableQuizMode === 'prefix') {
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>What is the prefix of <strong>${v.infinitive}</strong>?</p>`;
+      answerArea.innerHTML = `<input id='separableAns' class='p-2 border rounded w-full' placeholder='Type the prefix...'>${skipNextHtml}`;
+    } else if (separableQuizMode === 'usage') {
+      questionArea.innerHTML = backBtnHtml + `<p class='mb-2 text-sm text-gray-600'>Level: ${v.level}</p><p class='mb-4 text-xl'>Complete: <strong>Ich ___ dich ___.</strong> (I call you)</p><p class='mb-2 text-sm text-gray-500'>Use the correct form of <strong>${v.infinitive}</strong></p>`;
+      answerArea.innerHTML = `<input id='separableAns' class='p-2 border rounded w-full' placeholder='Type: rufe an' data-expected='rufe an'>${skipNextHtml}`;
+    }
+    
+    document.getElementById('check-btn').addEventListener('click', checkSeparableVerbAnswer);
+    document.getElementById('skip-btn').addEventListener('click', () => separableNext());
+    const backToMenuBtn = document.getElementById('separable-back-to-quiz-menu');
+    if (backToMenuBtn) backToMenuBtn.addEventListener('click', showSeparableVerbsQuizMenu);
+  }
+
+  function checkSeparableVerbAnswer() {
+    const v = separableVerbsPool[separableQuizIndex];
+    const ansEl = document.getElementById('separableAns');
+    if (!ansEl) return;
+    const user = ansEl.value.trim();
+    let correct = false;
+    let correctText = '';
+    
+    if (separableQuizMode === 'meaning') {
+      correctText = v.english;
+      correct = isMeaningMatch(user, v.acceptedMeanings || [v.english]);
+    } else if (separableQuizMode === 'conjugation') {
+      const pronoun = ansEl.dataset.pronoun;
+      correctText = v.conjugation[pronoun];
+      correct = normalizeGerman(user) === normalizeGerman(correctText);
+    } else if (separableQuizMode === 'prefix') {
+      correctText = v.prefix;
+      correct = normalizeGerman(user) === normalizeGerman(correctText);
+    } else if (separableQuizMode === 'usage') {
+      // For usage questions, we'll use a simple example with "anrufen"
+      if (v.infinitive === 'anrufen') {
+        correctText = 'rufe an';
+        correct = normalizeGerman(user) === normalizeGerman(correctText);
+      } else {
+        // For other separable verbs, use their ich form
+        correctText = v.conjugation['ich'];
+        correct = normalizeGerman(user) === normalizeGerman(correctText);
+      }
+    }
+    
+    if (correct) {
+      answerArea.innerHTML = `<div class='p-4 bg-green-100 rounded'>✅ Correct! <button class='btn btn-primary ml-2' id='next-btn'>Next</button></div>`;
+      document.getElementById('next-btn').addEventListener('click', () => separableNext(true));
+    } else {
+      answerArea.innerHTML = `<div class='p-4 bg-red-100 rounded'>❌ Not quite. Correct: <strong>${correctText}</strong><div class='mt-3'><button class='btn btn-primary ml-2' id='next-btn'>Next</button></div></div>`;
+      document.getElementById('next-btn').addEventListener('click', () => separableNext(false));
+    }
+  }
+
+  function separableNext(wasCorrect) {
+    const v = separableVerbsPool[separableQuizIndex];
+    if (v && userProgress[v.id]) updateSRS(v.id, !!wasCorrect);
+    separableQuizIndex = (separableQuizIndex + 1) % separableVerbsPool.length;
+    askSeparableVerbQuestion();
+  }
+
+  // --- Irregular verbs stubs (reuse existing flows) ---
+  let irregularQuizIndex = 0; let irregularQuizMode = null; let irregularLevelFilter = null; let irregularVerbsPool = [];
+  function openIrregularVerbsMenu(level) {
+    irregularLevelFilter = level || irregularLevelFilter || 'A1';
+    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = `Irregular Verbs — ${irregularLevelFilter}`;
+    questionArea.innerHTML = `
+      <div class='space-y-4'>
+        <button class='btn btn-secondary w-full' id='irregular-back'>Back</button>
         <button class='btn btn-primary w-full' id='btn-irregular-info'>Comprehensive Info</button>
         <button class='btn btn-primary w-full' id='btn-irregular-list'>List of Irregular Verbs</button>
         <button class='btn btn-primary w-full' id='btn-irregular-quiz'>Interactive Quizzes</button>
       </div>`;
     answerArea.innerHTML = '';
-    document.getElementById('irregular-back-to-dashboard').addEventListener('click', () => showView(dashboardView));
+    document.getElementById('irregular-back').addEventListener('click', () => {
+      if (irregularLevelFilter === 'A1') showView(levelA1View); else showView(levelA2View);
+    });
     document.getElementById('btn-irregular-info').addEventListener('click', showIrregularVerbsInfo);
     document.getElementById('btn-irregular-list').addEventListener('click', showIrregularVerbsList);
     document.getElementById('btn-irregular-quiz').addEventListener('click', showIrregularVerbsQuizMenu);
   }
   function showIrregularVerbsInfo() {
-    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = 'Irregular Verbs - Comprehensive Info';
+    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = `Irregular Verbs - Comprehensive Info (${irregularLevelFilter})`;
     questionArea.innerHTML = `
       <button class='btn btn-secondary mb-4' id='irregular-back-to-menu'>Back</button>
       <h2 class='text-lg font-bold mb-4'>Irregular Verbs — Overview & Patterns (A1–A2)</h2>
@@ -419,21 +738,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('irregular-back-to-menu').addEventListener('click', openIrregularVerbsMenu);
   }
   function showIrregularVerbsList() {
-    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = 'Irregular Verbs - Complete List';
-    const a1Verbs = vocabulary.irregularVerbs.filter(v => v.level === 'A1');
-    const a2Verbs = vocabulary.irregularVerbs.filter(v => v.level === 'A2');
-    let html = `<button class='btn btn-secondary mb-4' id='irregular-back-to-menu-2'>Back</button><h2 class="text-lg font-bold mb-4">Irregular Verbs — List</h2>`;
-    const renderTable = (title, list) => {
-      let t = `<h3 class='text-md font-bold mb-3'>${title}</h3><div style='overflow:auto'><table><thead><tr><th>Infinitive</th><th>English</th><th>ich</th><th>du</th><th>er/sie/es</th><th>wir</th><th>ihr</th><th>sie/Sie</th><th>Partizip II</th><th>Aux</th></tr></thead><tbody>`;
-      list.forEach(v => { t += `<tr><td><strong>${v.infinitive}</strong></td><td>${v.english}</td><td>${v.conjugation['ich']}</td><td>${v.conjugation['du']}</td><td>${v.conjugation['er/sie/es']}</td><td>${v.conjugation['wir']}</td><td>${v.conjugation['ihr']}</td><td>${v.conjugation['sie/Sie']}</td><td>${v.partizipII}</td><td>${v.perfectAux}</td></tr>`; });
-      return t + '</tbody></table></div>';
-    };
-    html += renderTable('A1', a1Verbs) + renderTable('A2', a2Verbs);
+    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = `Irregular Verbs - List (${irregularLevelFilter})`;
+    const list = vocabulary.irregularVerbs.filter(v => v.level === irregularLevelFilter);
+    let html = `<button class='btn btn-secondary mb-4' id='irregular-back-to-menu-2'>Back</button><h2 class="text-lg font-bold mb-4">Irregular Verbs — ${irregularLevelFilter}</h2>`;
+    html += `<div style='overflow:auto'><table><thead><tr><th>Infinitive</th><th>English</th><th>ich</th><th>du</th><th>er/sie/es</th><th>wir</th><th>ihr</th><th>sie/Sie</th><th>Partizip II</th><th>Aux</th><th>Example</th></tr></thead><tbody>`;
+    list.forEach(v => { html += `<tr><td><strong>${v.infinitive}</strong></td><td>${v.english}</td><td>${v.conjugation['ich']}</td><td>${v.conjugation['du']}</td><td>${v.conjugation['er/sie/es']}</td><td>${v.conjugation['wir']}</td><td>${v.conjugation['ihr']}</td><td>${v.conjugation['sie/Sie']}</td><td>${v.partizipII}</td><td>${v.perfectAux}</td><td>${v.example.de}</td></tr>`; });
+    html += '</tbody></table></div>';
     questionArea.innerHTML = html; answerArea.innerHTML = '';
     document.getElementById('irregular-back-to-menu-2').addEventListener('click', openIrregularVerbsMenu);
   }
   function showIrregularVerbsQuizMenu() {
-    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = 'Irregular Verbs - Interactive Quizzes';
+    const practiceTypeEl = document.getElementById('practice-type'); if (practiceTypeEl) practiceTypeEl.textContent = `Irregular Verbs - Interactive Quizzes (${irregularLevelFilter})`;
     questionArea.innerHTML = `
       <div class='space-y-3'>
         <button class='btn btn-secondary w-full' id='irregular-back-to-menu-3'>Back</button>
@@ -449,9 +764,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('quiz-irregular-partizip').addEventListener('click', () => startIrregularQuiz('partizip'));
     document.getElementById('quiz-irregular-perfect').addEventListener('click', () => startIrregularQuiz('perfect'));
   }
-  function startIrregularQuiz(mode) { irregularQuizMode = mode; irregularQuizIndex = 0; askIrregularVerbQuestion(); }
+  function startIrregularQuiz(mode) {
+    irregularQuizMode = mode; irregularQuizIndex = 0;
+    irregularVerbsPool = vocabulary.irregularVerbs.filter(v => v.level === irregularLevelFilter);
+    askIrregularVerbQuestion();
+  }
   function askIrregularVerbQuestion() {
-    const v = vocabulary.irregularVerbs[irregularQuizIndex]; if (!v) { questionArea.innerHTML = '<p>No irregular verbs available.</p>'; answerArea.innerHTML = ''; return; }
+    const v = irregularVerbsPool[irregularQuizIndex]; if (!v) { questionArea.innerHTML = '<p>No irregular verbs available.</p>'; answerArea.innerHTML = ''; return; }
     const backBtnHtml = `<button class='btn btn-secondary mb-3' id='irregular-back-to-quiz-menu'>Back to Quiz Menu</button>`;
     const skipNextHtml = `<div class='mt-2 flex gap-2'><button class='btn btn-primary' id='check-btn'>Check</button><button class='btn btn-secondary' id='skip-btn'>Skip</button></div>`;
     if (irregularQuizMode === 'meaning') {
@@ -474,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToMenuBtn = document.getElementById('irregular-back-to-quiz-menu'); if (backToMenuBtn) backToMenuBtn.addEventListener('click', showIrregularVerbsQuizMenu);
   }
   function checkIrregularVerbAnswer() {
-    const v = vocabulary.irregularVerbs[irregularQuizIndex]; const ansEl = document.getElementById('irregularAns'); if (!ansEl) return; const user = ansEl.value.trim();
+    const v = irregularVerbsPool[irregularQuizIndex]; const ansEl = document.getElementById('irregularAns'); if (!ansEl) return; const user = ansEl.value.trim();
     let correct = false; let correctText = '';
     if (irregularQuizMode === 'meaning') { correctText = v.english; correct = isMeaningMatch(user, v.acceptedMeanings || [v.english]); }
     else if (irregularQuizMode === 'conjugation') { const pronoun = ansEl.dataset.pronoun; correctText = v.conjugation[pronoun]; correct = normalizeGerman(user) === normalizeGerman(correctText); }
@@ -483,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (correct) { answerArea.innerHTML = `<div class='p-4 bg-green-100 rounded'>✅ Correct! <button class='btn btn-primary ml-2' id='next-btn'>Next</button></div>`; document.getElementById('next-btn').addEventListener('click', () => irregularNext(true)); }
     else { answerArea.innerHTML = `<div class='p-4 bg-red-100 rounded'>❌ Not quite. Correct: <strong>${correctText}</strong><div class='mt-3'><button class='btn btn-primary ml-2' id='next-btn'>Next</button></div></div>`; document.getElementById('next-btn').addEventListener('click', () => irregularNext(false)); }
   }
-  function irregularNext(wasCorrect) { const v = vocabulary.irregularVerbs[irregularQuizIndex]; if (v && userProgress[v.id]) updateSRS(v.id, !!wasCorrect); irregularQuizIndex = (irregularQuizIndex + 1) % vocabulary.irregularVerbs.length; askIrregularVerbQuestion(); }
+  function irregularNext(wasCorrect) { const v = irregularVerbsPool[irregularQuizIndex]; if (v && userProgress[v.id]) updateSRS(v.id, !!wasCorrect); irregularQuizIndex = (irregularQuizIndex + 1) % irregularVerbsPool.length; askIrregularVerbQuestion(); }
 
   // Go!
   initialize();

@@ -16,65 +16,84 @@
             <button id="progress-btn" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">Mein Fortschritt</button>
         </header>
 
-        <!-- Dashboard View -->
+        <!-- Level Home (A1 / A2) -->
         <main id="dashboard-view">
             <div class="mb-8 p-6 card">
-                <h2 class="text-2xl font-semibold mb-2">Guten Tag!</h2>
-                <p class="text-gray-600 mb-4">Ready for your daily German practice?</p>
-                <button id="start-review-btn" class="btn btn-primary w-full md:w-auto">
-                    Start Today's Review (<span id="review-count">0</span>)
-                </button>
+                <h2 class="text-2xl font-semibold mb-2">Choose Your Level</h2>
+                <p class="text-gray-600 mb-4">Select A1 or A2 to begin.</p>
+                <p class="text-sm text-gray-500">Ready for review? <button id="start-review-btn" class="text-indigo-600 hover:text-indigo-800 font-medium">Start Today's Review (<span id="review-count">0</span>)</button></p>
             </div>
-
-            <!-- Modules -->
-            <div class="space-y-8">
-                <div>
-                    <h3 class="text-2xl font-semibold mb-4 border-b pb-2">Nomen (Nouns)</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="noun-gender">
-                            <h4 class="font-bold text-lg">Gender Practice</h4><p class="text-sm text-gray-500">der, die, das</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="noun-plural">
-                            <h4 class="font-bold text-lg">Plural Forms</h4><p class="text-sm text-gray-500">Practice noun plurals</p>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div id="card-a1" class="card p-8 cursor-pointer">
+                    <h3 class="text-xl font-bold">A1 German</h3>
+                    <p class="text-gray-500">Basics for beginners</p>
                 </div>
-                <div>
-                    <h3 class="text-2xl font-semibold mb-4 border-b pb-2">Verben (Verbs)</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="card p-6 cursor-pointer module-card" data-module="modal-verbs">
-                            <h4 class="font-bold text-lg">Modal Verbs</h4>
-                            <p class="text-sm text-gray-500">Learn & Practice Modal Verbs</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="verb-conjugation">
-                            <h4 class="font-bold text-lg">Conjugation</h4><p class="text-sm text-gray-500">Present tense forms</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="verb-type">
-                             <h4 class="font-bold text-lg">Verb Types</h4><p class="text-sm text-gray-500">Regular / Irregular</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-module="separable-verbs">
-                            <h4 class="font-bold text-lg">Separable Verbs</h4>
-                            <p class="text-sm text-gray-500">Prefixes & Usage</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-module="irregular-verbs">
-                            <h4 class="font-bold text-lg">Irregular Verbs</h4>
-                            <p class="text-sm text-gray-500">Conjugation & Practice</p>
-                        </div>
-                    </div>
-                </div>
-                 <div>
-                    <h3 class="text-2xl font-semibold mb-4 border-b pb-2">Vocabulary Practice</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="flashcard-de-en">
-                            <h4 class="font-bold text-lg">Flashcards (DE-EN)</h4><p class="text-sm text-gray-500">German to English</p>
-                        </div>
-                        <div class="card p-6 cursor-pointer module-card" data-quiz-type="flashcard-en-de">
-                             <h4 class="font-bold text-lg">Flashcards (EN-DE)</h4><p class="text-sm text-gray-500">English to German</p>
-                        </div>
-                    </div>
+                <div id="card-a2" class="card p-8 cursor-pointer">
+                    <h3 class="text-xl font-bold">A2 German</h3>
+                    <p class="text-gray-500">Build on the basics</p>
                 </div>
             </div>
         </main>
+
+        <!-- A1 Level View -->
+        <div id="level-a1-view" class="hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <h2 class="text-2xl font-semibold">A1 German</h2>
+                <button class="btn btn-secondary" id="a1-back">Back</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div id="a1-nouns" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Nouns</h3>
+                    <p class="text-sm text-gray-500">Gender & Plural (A1)</p>
+                </div>
+                <div id="a1-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Verbs</h3>
+                    <p class="text-sm text-gray-500">Modal & Irregular (A1)</p>
+                </div>
+                <div id="a1-irregular-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Irregular Verbs</h3>
+                    <p class="text-sm text-gray-500">Only A1 irregular verbs</p>
+                </div>
+                <div id="a1-modal-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Modal Verbs</h3>
+                    <p class="text-sm text-gray-500">A1 modal verbs (können, müssen, etc.)</p>
+                </div>
+                <div id="a1-separable-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Separable Verbs</h3>
+                    <p class="text-sm text-gray-500">A1 separable verbs (anrufen, aufstehen, etc.)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- A2 Level View -->
+        <div id="level-a2-view" class="hidden">
+            <div class="mb-6 flex items-center justify-between">
+                <h2 class="text-2xl font-semibold">A2 German</h2>
+                <button class="btn btn-secondary" id="a2-back">Back</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div id="a2-nouns" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Nouns</h3>
+                    <p class="text-sm text-gray-500">Gender & Plural (A2)</p>
+                </div>
+                <div id="a2-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Verbs</h3>
+                    <p class="text-sm text-gray-500">Irregular (A2)</p>
+                </div>
+                <div id="a2-irregular-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Irregular Verbs</h3>
+                    <p class="text-sm text-gray-500">Only A2 irregular verbs</p>
+                </div>
+                <div id="a2-modal-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Modal Verbs</h3>
+                    <p class="text-sm text-gray-500">A2 modal verbs (advanced usage)</p>
+                </div>
+                <div id="a2-separable-verbs" class="card p-6 cursor-pointer">
+                    <h3 class="text-lg font-bold">Separable Verbs</h3>
+                    <p class="text-sm text-gray-500">A2 separable verbs (advanced patterns)</p>
+                </div>
+            </div>
+        </div>
 
         <!-- Practice View -->
         <div id="practice-view" class="hidden">
